@@ -1,18 +1,39 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Google Photos Link</title>
+<title>Google Photos Links</title>
 <style>
 body{font-family:system-ui;background:#111;color:#eee;padding:16px;max-width:1100px;margin:auto}
-input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;border-radius:8px;border:0;margin:12px 0}
+input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;border-radius:8px;border:0;margin:8px 0}
 button{background:#2a7fff;color:#fff;border:0;border-radius:8px;padding:14px 20px;font-size:18px}
+.item{display:flex;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #333;font-size:18px}
+.item a{flex:1;color:#7ab4ff;word-break:break-all}
+.item button{background:#444;padding:8px 12px;font-size:16px}
 </style></head><body>
-<h1>Google Photos Link</h1>
-<nav style="margin-bottom:12px"><a href="/" style="color:#7ab4ff">Upload</a> &nbsp;|&nbsp; <a href="/link.html" style="color:#fff"><b>Google Photos link</b></a></nav>
+<h1>Google Photos Links</h1>
+<nav style="margin-bottom:12px"><a href="/" style="color:#7ab4ff">Upload</a> &nbsp;|&nbsp; <a href="/link.html" style="color:#fff"><b>Google Photos links</b></a></nav>
+<input id="t" placeholder="Name (optional)">
 <input id="g" type="url" placeholder="Paste Google Photos link">
-<button id="go">Open in Google Photos</button>
+<button id="go">Save link</button>
+<div id="s"></div><div id="l"></div>
 <script>
-document.getElementById("go").onclick = () => {
-  const u = document.getElementById("g").value.trim();
-  if (/^https?:\/\//.test(u)) location.href = u;
+const $ = id => document.getElementById(id);
+async function load() {
+  const items = await (await fetch("/api/links")).json();
+  $("l").innerHTML = "";
+  items.forEach(it => {
+    const d = document.createElement("div"); d.className = "item";
+    const a = document.createElement("a"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = it.title || it.url;
+    const x = document.createElement("button"); x.textContent = "Delete";
+    x.onclick = async () => { await fetch("/api/links?id=" + it.id, { method: "DELETE" }); load(); };
+    d.append(a, x); $("l").append(d);
+  });
+}
+$("go").onclick = async () => {
+  const url = $("g").value.trim();
+  if (!/^https?:\/\//.test(url)) { $("s").textContent = "Paste a valid link"; return; }
+  const r = await fetch("/api/links", { method: "POST", body: JSON.stringify({ url, title: $("t").value.trim() }) });
+  $("s").textContent = r.ok ? "Saved" : "Error saving";
+  if (r.ok) { $("g").value = ""; $("t").value = ""; load(); }
 };
+load();
 </script></body></html>
