@@ -12,6 +12,7 @@ progress{width:100%;height:14px;margin-top:10px}
 <h1>My Videos</h1>
 <label class="b">Upload video<input id="f" type="file" accept="video/*"></label>
 <progress id="p" value="0" max="1" hidden></progress><div id="s"></div>
+<div style="margin-top:16px"><input id="g" type="url" placeholder="Paste Google Photos link" style="width:65%;padding:14px;font-size:18px;border-radius:8px;border:0"> <button id="go">Open</button></div>
 <video id="v" controls playsinline hidden></video>
 <div id="l"></div>
 <script>
@@ -45,5 +46,6 @@ $("f").onchange = async (e) => {
     $("s").textContent = "Done!"; const items = await load(); play(items.find(x => x.id === id) || items[0]);
   } catch (err) { $("s").textContent = "Error: " + err.message; }
 };
+$("go").onclick = () => { const u = $("g").value.trim(); if (/^https?:\/\//.test(u)) window.open(u, "_blank", "noopener"); };
 load();
 </script></body></html>
