@@ -1,50 +1,57 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Videos</title>
-<style>
-body{font-family:system-ui;background:#111;color:#eee;margin:0;padding:16px;max-width:1100px;margin:auto}
-video{width:100%;background:#000;border-radius:8px;margin-top:12px}
-button,label.b{background:#2a7fff;color:#fff;border:0;border-radius:8px;padding:14px 20px;font-size:18px;display:inline-block}
-input[type=file]{display:none}
-progress{width:100%;height:14px;margin-top:10px}
-.item{padding:14px;border-bottom:1px solid #333;font-size:18px;cursor:pointer}
-</style></head><body>
-<h1>My Videos</h1>
-<nav style="margin-bottom:12px"><a href="/" style="color:#fff"><b>Upload</b></a> &nbsp;|&nbsp; <a href="/link.html" style="color:#7ab4ff">Google Photos link</a></nav>
-<label class="b">Upload video<input id="f" type="file" accept="video/*"></label>
-<progress id="p" value="0" max="1" hidden></progress><div id="s"></div>
-<video id="v" controls playsinline hidden></video>
-<div id="l"></div>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>My Videos</title><link rel="stylesheet" href="/style.css"></head><body><div class="wrap">
+<header><div class="logo"><i>▶</i>My Videos</div>
+<nav><a class="on" href="/">Videos</a><a href="/link.html">Google Photos</a></nav></header>
+
+<label class="drop" id="dz"><div class="ic">⬆️</div><b>Tap to upload a video</b><span>Full quality, nothing re-encoded. Or drag &amp; drop.</span>
+<input id="f" type="file" accept="video/*"></label>
+<div class="bar" id="bar" hidden><div id="fill"></div></div><div class="msg" id="s"></div>
+
+<div class="player" id="pl" hidden><video id="v" controls playsinline></video></div>
+
+<h2>Your videos</h2>
+<div class="grid" id="l"></div>
+
 <script>
 const CH = 4 * 1024 * 1024, $ = id => document.getElementById(id);
-const play = (it) => { const v = $("v"); v.hidden = false; v.src = "/api/video?id=" + it.id; v.play().catch(()=>{}); v.scrollIntoView(); };
-async function load() {
-  const items = await (await fetch("/api/list")).json();
-  $("l").innerHTML = "";
-  items.forEach(it => { const d = document.createElement("div"); d.className = "item";
-    d.textContent = `${it.name} (${(it.size/1048576).toFixed(0)} MB)`; d.onclick = () => play(it); $("l").append(d); });
-  return items;
+let current = null;
+const mb = n => n >= 1073741824 ? (n/1073741824).toFixed(2)+" GB" : (n/1048576).toFixed(0)+" MB";
+function play(it){ current = it.id; $("pl").hidden = false; const v = $("v"); v.src = "/api/video?id=" + it.id; v.play().catch(()=>{}); $("pl").scrollIntoView({behavior:"smooth",block:"center"}); render(); }
+let items = [];
+function render(){
+  const l = $("l"); l.innerHTML = "";
+  if(!items.length){ l.innerHTML = '<div class="empty" style="grid-column:1/-1">No videos yet. Upload your first one above.</div>'; return; }
+  items.forEach(it => { const d = document.createElement("div"); d.className = "vid" + (it.id===current?" now":"");
+    d.innerHTML = '<div class="th">▶️</div><div class="in"><div class="nm"></div><div class="sz"></div></div>';
+    d.querySelector(".nm").textContent = it.name; d.querySelector(".sz").textContent = mb(it.size);
+    d.onclick = () => play(it); l.append(d); });
 }
-async function post(url, body, tries = 5) {
-  for (let t = 0; t < tries; t++) {
-    try { const r = await fetch(url, { method: "POST", body }); if (r.ok) return; } catch {}
-    await new Promise(r => setTimeout(r, 1000 * (t + 1)));
-  }
-  throw new Error("upload failed");
+async function load(){ try { items = await (await fetch("/api/list")).json(); } catch { items = []; } render(); return items; }
+async function post(url, body, tries = 5){
+  for (let t = 0; t < tries; t++){ try { const r = await fetch(url,{method:"POST",body}); if (r.ok) return; } catch {} await new Promise(r=>setTimeout(r,1000*(t+1))); }
+  throw new Error("Upload failed. Check your connection and try again.");
 }
-$("f").onchange = async (e) => {
-  const file = e.target.files[0]; if (!file) return;
-  const id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-  const count = Math.ceil(file.size / CH), p = $("p"); p.hidden = false; p.max = count; p.value = 0;
+async function upload(file){
+  if(!file) return;
+  const id = Math.random().toString(36).slice(2,10)+Date.now().toString(36), count = Math.ceil(file.size/CH);
+  $("bar").hidden = false; $("fill").style.width = "0"; $("s").className = "msg";
   try {
-    for (let i = 0; i < count; i++) {
-      $("s").textContent = `Uploading ${i + 1}/${count}…`;
-      await post(`/api/upload?id=${id}&i=${i}`, file.slice(i * CH, (i + 1) * CH));
-      p.value = i + 1;
+    for (let i = 0; i < count; i++){
+      $("s").textContent = `Uploading… ${Math.round(i/count*100)}%`;
+      await post(`/api/upload?id=${id}&i=${i}`, file.slice(i*CH,(i+1)*CH));
+      $("fill").style.width = ((i+1)/count*100)+"%";
     }
-    await post(`/api/upload?id=${id}&done=1`, JSON.stringify({ name: file.name, type: file.type || "video/mp4", size: file.size, chunkSize: CH, count }));
-    $("s").textContent = "Done!"; const items = await load(); play(items.find(x => x.id === id) || items[0]);
-  } catch (err) { $("s").textContent = "Error: " + err.message; }
-};
+    await post(`/api/upload?id=${id}&done=1`, JSON.stringify({name:file.name,type:file.type||"video/mp4",size:file.size,chunkSize:CH,count}));
+    $("s").textContent = "Upload complete"; $("s").className = "msg ok";
+    const all = await load(); play(all.find(x=>x.id===id)||all[0]);
+    setTimeout(()=>{ $("bar").hidden = true; }, 1500);
+  } catch(e){ $("s").textContent = e.message; $("s").className = "msg err"; }
+}
+$("f").onchange = e => { upload(e.target.files[0]); e.target.value = ""; };
+const dz = $("dz");
+["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); }));
+dz.addEventListener("drop", e => upload(e.dataTransfer.files[0]));
 load();
-</script></body></html>
+</script></div></body></html>

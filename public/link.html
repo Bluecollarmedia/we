@@ -1,39 +1,42 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Google Photos Links</title>
-<style>
-body{font-family:system-ui;background:#111;color:#eee;padding:16px;max-width:1100px;margin:auto}
-input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;border-radius:8px;border:0;margin:8px 0}
-button{background:#2a7fff;color:#fff;border:0;border-radius:8px;padding:14px 20px;font-size:18px}
-.item{display:flex;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #333;font-size:18px}
-.item a{flex:1;color:#7ab4ff;word-break:break-all}
-.item button{background:#444;padding:8px 12px;font-size:16px}
-</style></head><body>
-<h1>Google Photos Links</h1>
-<nav style="margin-bottom:12px"><a href="/" style="color:#7ab4ff">Upload</a> &nbsp;|&nbsp; <a href="/link.html" style="color:#fff"><b>Google Photos links</b></a></nav>
-<input id="t" placeholder="Name (optional)">
-<input id="g" type="url" placeholder="Paste Google Photos link">
-<button id="go">Save link</button>
-<div id="s"></div><div id="l"></div>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Google Photos Links</title><link rel="stylesheet" href="/style.css"></head><body><div class="wrap">
+<header><div class="logo"><i>▶</i>My Videos</div>
+<nav><a href="/">Videos</a><a class="on" href="/link.html">Google Photos</a></nav></header>
+
+<div class="add">
+  <input id="t" placeholder="Name (optional)">
+  <div class="row"><input id="g" type="url" inputmode="url" placeholder="Paste Google Photos link"><button class="btn" id="go">Save link</button></div>
+  <div class="msg" id="s"></div>
+</div>
+
+<h2>Saved links</h2>
+<div class="links" id="l"></div>
+
 <script>
 const $ = id => document.getElementById(id);
-async function load() {
-  const items = await (await fetch("/api/links")).json();
-  $("l").innerHTML = "";
+const host = u => { try { return new URL(u).host; } catch { return u; } };
+async function load(){
+  let items = []; try { items = await (await fetch("/api/links")).json(); } catch {}
+  const l = $("l"); l.innerHTML = "";
+  if(!items.length){ l.innerHTML = '<div class="empty">No links saved yet. Paste one above.</div>'; return; }
   items.forEach(it => {
-    const d = document.createElement("div"); d.className = "item";
-    const a = document.createElement("a"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = it.title || it.url;
-    const x = document.createElement("button"); x.textContent = "Delete";
-    x.onclick = async () => { await fetch("/api/links?id=" + it.id, { method: "DELETE" }); load(); };
-    d.append(a, x); $("l").append(d);
+    const d = document.createElement("div"); d.className = "lk";
+    d.innerHTML = '<div class="ic">📷</div><a target="_blank" rel="noopener"><b></b><span></span></a><button class="btn ghost">Delete</button>';
+    const a = d.querySelector("a"); a.href = it.url;
+    a.querySelector("b").textContent = it.title || "Google Photos video"; a.querySelector("span").textContent = it.url;
+    d.querySelector("button").onclick = async () => { await fetch("/api/links?id="+it.id,{method:"DELETE"}); load(); };
+    l.append(d);
   });
 }
-$("go").onclick = async () => {
-  const url = $("g").value.trim();
-  if (!/^https?:\/\//.test(url)) { $("s").textContent = "Paste a valid link"; return; }
-  const r = await fetch("/api/links", { method: "POST", body: JSON.stringify({ url, title: $("t").value.trim() }) });
-  $("s").textContent = r.ok ? "Saved" : "Error saving";
-  if (r.ok) { $("g").value = ""; $("t").value = ""; load(); }
-};
+async function save(){
+  const url = $("g").value.trim(), m = $("s");
+  if(!/^https?:\/\//.test(url)){ m.textContent = "Paste a valid link"; m.className = "msg err"; return; }
+  const r = await fetch("/api/links",{method:"POST",body:JSON.stringify({url,title:$("t").value.trim()})});
+  m.textContent = r.ok ? "Saved" : "Couldn't save, try again"; m.className = "msg " + (r.ok ? "ok" : "err");
+  if(r.ok){ $("g").value = ""; $("t").value = ""; load(); }
+}
+$("go").onclick = save;
+$("g").addEventListener("keydown", e => { if(e.key==="Enter") save(); });
 load();
-</script></body></html>
+</script></div></body></html>
